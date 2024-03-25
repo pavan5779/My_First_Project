@@ -9,47 +9,46 @@ pipeline {
             }
         }
         stage('Static Code Analysis') {
-            environment {
-                SONAR_HOST_URL = "http://13.210.222.6:9000"
-            }
-            steps {
-                withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
-                    sh '''
-                        cd /Files
-                        mvn sonar:sonar \
-                            -Dsonar.login=$SONAR_AUTH_TOKEN \
-                            -Dsonar.host.url=${SONAR_HOST_URL}
-                    '''
-                }
-            }
-        }
-        stage('Build and Push Docker Image') {
-            environment {
-                DOCKER_IMAGE = 'gettingstarted'
-                AWS_REGION = 'ap-southeast-2'
-                ECR_REGISTRY_URL = '339713116286.dkr.ecr.ap-southeast-2.amazonaws.com/my_first_project'
-            }
-            steps {
-                script {
-                    // Authenticate with ECR
-                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'Aws Credentials', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
-                        sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY_URL}"
-                    }
-                    // Build Docker image
-                        sh 'docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} ./Files'
-                    
-                    // Tag Docker image with 'latest'
-                        sh 'docker tag ${DOCKER_IMAGE}:${BUILD_NUMBER} ${ECR_REGISTRY_URL}:latest'
-                    
-                    // Push Docker image to ECR
-                        sh 'docker push ${ECR_REGISTRY_URL}:latest'
-                }
-            }
+    environment {
+        SONAR_HOST_URL = "http://13.210.222.6:9000"
+    }
+    steps {
+        withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
+            sh '''
+                cd /var/lib/jenkins/workspace/My_First_Project/Files
+                mvn sonar:sonar \
+                    -Dsonar.login=$SONAR_AUTH_TOKEN \
+                    -Dsonar.host.url=${SONAR_HOST_URL}
+            '''
         }
     }
-    post {
-        failure {
-            echo 'One or more stages failed, but the pipeline will continue...'
+}
+
+stage('Build and Push Docker Image') {
+    environment {
+        DOCKER_IMAGE = 'gettingstarted'
+        AWS_REGION = 'ap-southeast-2'
+        ECR_REGISTRY_URL = '339713116286.dkr.ecr.ap-southeast-2.amazonaws.com/my_first_project'
+    }
+    steps {
+        script {
+            // Authenticate with ECR
+            withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'Aws Credentials', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY_URL}"
+            }
+            // Build Docker image
+            sh "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} /var/lib/jenkins/workspace/My_First_Project/Files"
+            
+            // Tag Docker image with 'latest'
+            sh "docker tag ${DOCKER_IMAGE}:${BUILD_NUMBER} ${ECR_REGISTRY_URL}:latest"
+            
+            // Push Docker image to ECR
+            sh "docker push ${ECR_REGISTRY_URL}:latest"
         }
+    }
+}
+post {
+    failure {
+        echo 'One or more stages failed, but the pipeline will continue...'
     }
 }

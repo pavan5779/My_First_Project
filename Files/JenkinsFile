@@ -5,7 +5,7 @@ pipeline {
             steps {
                 sh 'ls -ltr'
                 // Build the project and create a JAR file
-                sh '/Files && mvn clean package'
+                sh 'cd /var/lib/jenkins/workspace/My_First_Project/Files && mvn clean package'
             }
         }
         stage('Static Code Analysis') {

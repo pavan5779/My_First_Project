@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+    stages {
+        stage('Build and Test') {
+            steps {
+                sh 'ls -ltr'
+                // Build the project and create a JAR file
+                sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn clean package'
+            }
+        }
+        stage('Static Code Analysis') {
+            environment {
+                SONAR_HOST_URL = "http://13.211.191.250:9000"
+            }
+            steps {
+                withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
+                    sh '''
+                        cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                        mvn sonar:sonar \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN \
+                            -Dsonar.host.url=${SONAR_HOST_URL}
+                    '''
+                }
+            }
+        }
+        stage('Build and Push Docker Image') {
+            environment {
+                DOCKER_IMAGE = 'gettingstarted'
+                AWS_REGION = 'ap-southeast-2'
+                ECR_REGISTRY_URL = '339713116286.dkr.ecr.ap-southeast-2.amazonaws.com/jenkins'
+            }
+            steps {
+                script {
+                    // Authenticate with ECR
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'Aws Credentials', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                        sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY_URL}"
+                    }
+                    // Build Docker image
+                        sh 'docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} ./java-maven-sonar-argocd-helm-k8s/spring-boot-app'
+                    
+                    // Tag Docker image with 'latest'
+                        sh 'docker tag ${DOCKER_IMAGE}:${BUILD_NUMBER} ${ECR_REGISTRY_URL}:latest'
+                    
+                    // Push Docker image to ECR
+                        sh 'docker push ${ECR_REGISTRY_URL}:latest'
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            echo 'One or more stages failed, but the pipeline will continue...'
+        }
+    }
+}

@@ -24,7 +24,7 @@ pipeline {
         }
         stage('Build and Push Docker Image') {
             environment {
-                DOCKER_IMAGE = 'gettingstarted'
+                DOCKER_IMAGE = 'pavan5779/getting-started:${BUILD_NUMBER}'
                 AWS_REGION = 'ap-southeast-2'
                 ECR_REGISTRY_URL = '339713116286.dkr.ecr.ap-southeast-2.amazonaws.com/my_first_project'
             }
